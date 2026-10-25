@@ -11,13 +11,13 @@ The GitHub Actions workflow pins:
 - `herlesupreeth/docker_open5gs` lab/configuration commit `cfac9223bf3a1d10ea5faf31773a7defbd0c6b8f`;
 - NumPy `2.2.6` and scikit-learn `1.7.2`.
 
-The workflow builds Open5GS and UERANSIM from those source tags, starts a 5G SA core, provisions one UE, starts UERANSIM gNB/UE, captures cleartext HTTP/2 SBI traffic involving the AMF, and decodes CreateSMContext request/response attempts from the PCAP. Mid-run SMF restart creates a fresh connection epoch. An unsupported-DNN episode is attempted, but its status is measured rather than assumed.
+The workflow builds Open5GS and UERANSIM from those source tags, starts a 5G SA core, provisions one UE, starts UERANSIM gNB/UE, captures cleartext HTTP/2 SBI traffic involving the AMF, and decodes CreateSMContext request/response attempts from the PCAP. Mid-run SCP restart forces a fresh observed AMF–SCP HTTP/2 connection epoch. An unsupported-DNN episode is attempted, but its status is measured rather than assumed.
 
 ## Trust/evidence split used in CI
 
 GitHub-hosted CI cannot provide a physically independent trusted appliance. The experiment therefore emulates the trust split: the NF/self-report branch and the witness/verification branch are separate processes and artifacts, but they share one hosted runner. The PCAP is treated as the independent witness input for algorithm evaluation. This is suitable for reproducibility and correctness testing, not for claiming physical compromise resistance of the host.
 
-Network-derived events are never silently replaced with synthetic data. If no CreateSMContext attempts can be decoded, the job fails. Controlled scenarios that Open5GS does not reliably generate on demand (redirects, bounded witness loss, coordinated false self-reports, replay, scope substitution, and witness compromise) are generated after the network phase and clearly labelled synthetic extensions of the captured profile.
+Network-derived events are never silently replaced with synthetic data. If no CreateSMContext attempts can be decoded, the job fails. Controlled scenarios that Open5GS does not reliably generate on demand (overload/error/redirect transformations, bounded witness loss, coordinated false self-reports, replay, scope substitution, and witness compromise) bootstrap outcomes from the captured CreateSMContext profile and then apply explicit transformations. They are clearly labelled controlled extensions and are not presented as naturally occurring Open5GS failures.
 
 ## Comparisons implemented
 
