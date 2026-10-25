@@ -137,11 +137,7 @@ cat "$ART/events.json"
 python3 - "$ART/events.json" <<'PY'
 import json, re, sys
 events=json.load(open(sys.argv[1]))['events']
-create=re.compile(r'^/nsmf-pdusession/v[0-9]+/sm-contexts(?:\\?.*)?
-docker exec nr_ue sh -lc 'ip addr; ping -c 2 -W 2 -I uesimtun0 8.8.8.8' > "$ART/user-plane-smoke.txt" 2>&1 || true
-
-echo "network phase complete"
-)
+create=re.compile(r'^/nsmf-pdusession/v[0-9]+/sm-contexts(?:\\?.*)?$')
 if len(events) < 3:
     raise SystemExit(f'too few CreateSMContext attempts decoded: {len(events)}')
 bad=[e['path'] for e in events if not create.fullmatch(e['path'])]
