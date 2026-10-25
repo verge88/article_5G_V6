@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, json, subprocess, sys, xml.etree.ElementTree as ET
+import argparse, json, re, subprocess, sys, xml.etree.ElementTree as ET
 from collections import defaultdict
 from pathlib import Path
 
