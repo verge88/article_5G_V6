@@ -137,7 +137,7 @@ cat "$ART/events.json"
 python3 - "$ART/events.json" <<'PY'
 import json, re, sys
 payload=json.load(open(sys.argv[1])); events=payload['events']; capture_meta=payload.get('capture_metadata',{})
-create=re.compile(r'^/nsmf-pdusession/v[0-9]+/sm-contexts(?:\\?.*)?$')
+create=re.compile(r'^/nsmf-pdusession/v[0-9]+/sm-contexts(?:\?.*)?$')
 if len(events) < 3:
     raise SystemExit(f'too few CreateSMContext attempts decoded: {len(events)}')
 bad=[e['path'] for e in events if not create.fullmatch(e['path'])]
