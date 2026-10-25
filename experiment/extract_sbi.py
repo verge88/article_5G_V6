@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-import argparse, json, subprocess, sys, xml.etree.ElementTree as ET
+import argparse, json, re, subprocess, sys, xml.etree.ElementTree as ET
 from collections import defaultdict
 from pathlib import Path
 
-PROFILE_PREFIX = "/nsmf-pdusession/"
+CREATE_SM_CONTEXT_RE = re.compile(r"^/nsmf-pdusession/v[0-9]+/sm-contexts(?:\\?.*)?$")
 
 def field_values(elem, name):
     vals=[]
