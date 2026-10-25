@@ -1,0 +1,95 @@
+name: 5G KIE Open5GS UERANSIM experiment
+
+on:
+  push:
+    branches:
+      - experiment/open5gs-ueransim-actions
+    paths:
+      - 'experiment/**'
+      - '.github/workflows/5g-kie-experiment.yml'
+  workflow_dispatch:
+    inputs:
+      normal_repetitions:
+        description: 'UERANSIM normal PDU-session episodes'
+        required: false
+        default: '6'
+      synthetic_replicates:
+        description: 'Independent controlled-analysis replicates per scenario'
+        required: false
+        default: '80'
+
+permissions:
+  contents: read
+
+jobs:
+  experiment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      OPEN5GS_TAG: v2.8.0
+      UERANSIM_TAG: v3.3.0
+      DOCKER_OPEN5GS_COMMIT: cfac9223bf3a1d10ea5faf31773a7defbd0c6b8f
+      NORMAL_REPETITIONS: ${{ inputs.normal_repetitions || '6' }}
+      SYNTHETIC_REPLICATES: ${{ inputs.synthetic_replicates || '80' }}
+      PYTHONHASHSEED: '0'
+
+    steps:
+      - name: Checkout experiment
+        uses: actions/checkout@v4
+
+      - name: Host metadata
+        run: |
+          mkdir -p artifacts
+          uname -a | tee artifacts/host.txt
+          docker version | tee -a artifacts/host.txt
+          docker compose version | tee -a artifacts/host.txt
+
+      - name: Install packet and Python dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt-get update
+          echo 'wireshark-common wireshark-common/install-setuid boolean false' | sudo debconf-set-selections
+          sudo apt-get install -y tshark tcpdump jq
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r experiment/requirements.txt
+          python3 -m pip freeze > artifacts/python-freeze.txt
+          tshark --version | head -5 | tee artifacts/tshark-version.txt
+
+      - name: Verify finite-model invariants before network run
+        run: python3 experiment/run_analysis.py --self-test | tee artifacts/self-test.json
+
+      - name: Run Open5GS/UERANSIM and capture SBI witness
+        run: bash experiment/run_network.sh
+
+      - name: Run closed-loop comparisons and budget experiment
+        run: |
+          python3 experiment/run_analysis.py \
+            --events artifacts/network/events.json \
+            --outdir artifacts/analysis \
+            --seed 20261025 \
+            --replicates "$SYNTHETIC_REPLICATES" \
+            --attempts 24 | tee artifacts/analysis-console.txt
+
+      - name: Assert exact hierarchy equals centralized result in all trials
+        run: |
+          python3 - <<'PY'
+          import csv
+          rows=list(csv.DictReader(open('artifacts/analysis/detector_trials.csv')))
+          by={}
+          for r in rows:
+              by.setdefault((r['replicate'],r['scenario']),{})[r['detector']]=r['verdict']
+          bad=[k for k,v in by.items() if v.get('central_exact') != v.get('hierarchical_exact')]
+          if bad:
+              raise SystemExit(f'hierarchy mismatch: {bad[:10]}')
+          print(f'checked {len(by)} scenario-runs: exact hierarchy == exact central')
+          PY
+
+      - name: Upload complete experiment evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 5g-kie-open5gs-ueransim-evidence
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 30
