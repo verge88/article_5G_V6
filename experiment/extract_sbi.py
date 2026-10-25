@@ -98,7 +98,15 @@ def parse_pdml(pdml_path, smf_ip=None, client_ip=None):
             'path':req['path'],
             'source':'pcap',
         })
-    return events
+    sid_to_connections=defaultdict(set)
+    for tcp_stream,sid in streams:
+        sid_to_connections[int(sid)].add(int(tcp_stream))
+    capture_metadata={
+        'all_http2_connection_epochs':len({int(tcp_stream) for tcp_stream,_ in streams}),
+        'same_stream_id_across_connections':any(len(connections)>1 for connections in sid_to_connections.values()),
+        'reused_stream_ids':sorted([sid for sid,connections in sid_to_connections.items() if len(connections)>1]),
+    }
+    return events,capture_metadata
 
 def main():
     ap=argparse.ArgumentParser()
@@ -115,8 +123,8 @@ def main():
     if p.returncode != 0:
         sys.stderr.write(p.stderr.decode(errors='replace'))
         raise SystemExit(p.returncode)
-    events=parse_pdml(pdml,args.smf_ip,args.client_ip)
-    Path(args.output).write_text(json.dumps({'profile':'Nsmf_PDUSession CreateSMContext','events':events},indent=2),encoding='utf-8')
+    events,capture_metadata=parse_pdml(pdml,args.smf_ip,args.client_ip)
+    Path(args.output).write_text(json.dumps({'profile':'Nsmf_PDUSession CreateSMContext','events':events,'capture_metadata':capture_metadata},indent=2),encoding='utf-8')
     print(f'extracted {len(events)} CreateSMContext attempts')
     if not events:
         raise SystemExit('no CreateSMContext attempts decoded from PCAP')
