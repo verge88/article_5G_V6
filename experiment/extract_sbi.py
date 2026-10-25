@@ -49,9 +49,9 @@ def parse_pdml(pdml_path, smf_ip=None, client_ip=None):
         if not stream_fields:
             stream_fields=[h2]
         for se in stream_fields:
-            ids=field_values(se,'http2.streamid')
+            ids=[v for v in field_values(se,'http2.streamid') if str(v).isdigit()]
             if not ids:
-                ids=field_values(se,'http2.stream')
+                ids=[v for v in field_values(se,'http2.stream') if str(v).isdigit()]
             if not ids:
                 continue
             sid=ids[0]
