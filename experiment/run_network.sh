@@ -136,7 +136,7 @@ python3 "$ROOT/experiment/extract_sbi.py" --pcap "$ART/sbi.pcap" --output "$ART/
 cat "$ART/events.json"
 python3 - "$ART/events.json" <<'PY'
 import json, re, sys
-events=json.load(open(sys.argv[1]))['events']
+payload=json.load(open(sys.argv[1])); events=payload['events']; capture_meta=payload.get('capture_metadata',{})
 create=re.compile(r'^/nsmf-pdusession/v[0-9]+/sm-contexts(?:\\?.*)?$')
 if len(events) < 3:
     raise SystemExit(f'too few CreateSMContext attempts decoded: {len(events)}')
@@ -148,6 +148,8 @@ if not any(e.get('http_status') == 201 for e in events):
 epochs={e['connection_epoch'] for e in events}
 if len(epochs) < 2:
     raise SystemExit(f'connection-epoch scenario not exercised: only {epochs}')
+if not capture_meta.get('same_stream_id_across_connections'):
+    raise SystemExit('HTTP/2 stream-ID reuse across connections was not observed')
 print(f'validated {len(events)} CreateSMContext attempts across {len(epochs)} HTTP/2 connection epochs')
 PY
 
