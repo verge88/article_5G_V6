@@ -61,16 +61,16 @@ def parse_pdml(pdml_path, smf_ip=None, client_ip=None):
             if t: rec['times'].append(float(t))
             if src: rec['srcs'].append(src)
             if dst: rec['dsts'].append(dst)
-            method=headers.get(':method')
-            path=headers.get(':path')
-            status=headers.get(':status')
+            method=(field_values(se,'http2.headers.method') or [headers.get(':method')])[0]
+            path=(field_values(se,'http2.headers.path') or [headers.get(':path')])[0]
+            status=(field_values(se,'http2.headers.status') or [headers.get(':status')])[0]
             if method and path:
                 rec['requests'].append({'method':method,'path':path,'time':float(t) if t else None,'src':src,'dst':dst})
             if status:
                 rec['statuses'].append({'status':status,'time':float(t) if t else None,'src':src,'dst':dst})
     events=[]
     for (tcp_stream,sid),rec in sorted(streams.items(), key=lambda kv:(int(kv[0][0]),int(kv[0][1]))):
-        reqs=[r for r in rec['requests'] if r['method'].upper()=='POST' and r['path'].startswith(PROFILE_PREFIX) and '/sm-contexts' in r['path']]
+        reqs=[r for r in rec['requests'] if r['method'].upper()=='POST' and r['path'].split('?',1)[0]=='/nsmf-pdusession/v1/sm-contexts']
         if not reqs:
             continue
         req=reqs[0]
@@ -120,5 +120,11 @@ def main():
     print(f'extracted {len(events)} CreateSMContext attempts')
     if not events:
         raise SystemExit('no CreateSMContext attempts decoded from PCAP')
+    success=sum(e['truth']=='S' for e in events)
+    epochs=len(set(e['connection_epoch'] for e in events))
+    if success == 0:
+        raise SystemExit('CreateSMContext requests were seen, but no 201 response was decoded; capture must start before HTTP/2 connection establishment')
+    if epochs < 2:
+        raise SystemExit(f'expected at least two observed HTTP/2 connection epochs, got {epochs}')
 
 if __name__=='__main__': main()
