@@ -59,6 +59,11 @@ docker tag docker_open5gs:kie-${OPEN5GS_TAG} docker_open5gs:latest
 docker build --pull -t docker_ueransim:kie-${UERANSIM_TAG} ueransim
 docker tag docker_ueransim:kie-${UERANSIM_TAG} docker_ueransim:latest
 
+echo "== start independent AMF-boundary capture before 5GC =="
+sudo tcpdump -U -i any -s 0 -w "$ART/sbi.pcap" "tcp port 7777 and host ${AMF_IP}" &
+TCPDUMP_PID=$!
+sleep 2
+
 echo "== start 5GC =="
 docker compose -f sa-deploy.yaml up -d mongo nrf scp ausf udr udm pcf bsf nssf amf smf upf webui
 
@@ -81,11 +86,6 @@ echo "== start UERANSIM gNB =="
 docker compose -f nr-gnb.yaml up -d
 wait_log nr_gnb 'NG Setup procedure is successful|NG Setup.*success' 90
 
-echo "== start independent boundary capture before UE =="
-sudo tcpdump -U -i any -s 0 -w "$ART/sbi.pcap" "tcp port 7777 and host ${AMF_IP}" &
-TCPDUMP_PID=$!
-sleep 2
-
 success_count() { docker logs nr_ue 2>&1 | grep -Eic 'PDU Session establishment is successful|PDU Session.*success' || true; }
 wait_new_success() {
   local before="$1" timeout="${2:-75}" start now cur
@@ -105,8 +105,8 @@ for i in $(seq 1 "$NORMAL_REPETITIONS"); do
   wait_new_success "$before" 75
   echo "normal episode $i complete"
   if (( i == (NORMAL_REPETITIONS+1)/2 )); then
-    echo "restarting SMF to create a new HTTP/2 connection epoch"
-    docker restart smf >/dev/null
+    echo "restarting SCP to force a new observed AMF-SCP HTTP/2 connection epoch"
+    docker restart scp >/dev/null
     sleep 10
   fi
 done
@@ -134,6 +134,26 @@ stat -c '%s' "$ART/sbi.pcap" > "$ART/pcap-bytes.txt"
 echo "== decode Nsmf_PDUSession CreateSMContext from PCAP =="
 python3 "$ROOT/experiment/extract_sbi.py" --pcap "$ART/sbi.pcap" --output "$ART/events.json" --client-ip "$AMF_IP"
 cat "$ART/events.json"
+python3 - "$ART/events.json" <<'PY'
+import json, re, sys
+events=json.load(open(sys.argv[1]))['events']
+create=re.compile(r'^/nsmf-pdusession/v[0-9]+/sm-contexts(?:\\?.*)?
+docker exec nr_ue sh -lc 'ip addr; ping -c 2 -W 2 -I uesimtun0 8.8.8.8' > "$ART/user-plane-smoke.txt" 2>&1 || true
+
+echo "network phase complete"
+)
+if len(events) < 3:
+    raise SystemExit(f'too few CreateSMContext attempts decoded: {len(events)}')
+bad=[e['path'] for e in events if not create.fullmatch(e['path'])]
+if bad:
+    raise SystemExit(f'non-CreateSMContext paths leaked into profile: {bad[:5]}')
+if not any(e.get('http_status') == 201 for e in events):
+    raise SystemExit('no HTTP 201 CreateSMContext response decoded; witness capture/parser is incomplete')
+epochs={e['connection_epoch'] for e in events}
+if len(epochs) < 2:
+    raise SystemExit(f'connection-epoch scenario not exercised: only {epochs}')
+print(f'validated {len(events)} CreateSMContext attempts across {len(epochs)} HTTP/2 connection epochs')
+PY
 
 docker exec nr_ue sh -lc 'ip addr; ping -c 2 -W 2 -I uesimtun0 8.8.8.8' > "$ART/user-plane-smoke.txt" 2>&1 || true
 
