@@ -60,20 +60,32 @@ def mask(kind,n,rng):
 def report(t,kind):
  r=list(vec(t)); false=False; meta={}
  if kind=='inflate':
-  d=max(1,min(3,sum(r[1:]) or 1)); r[0]+=d
-  for j in (1,2,3): q=min(d,r[j]); r[j]-=q; d-=q
-  false=True
+  d=min(3,sum(r[1:]))
+  if d:
+   r[0]+=d; left=d
+   for j in (1,2,3):
+    q=min(left,r[j]); r[j]-=q; left-=q
+   false=True
  elif kind=='hide':
-  d=max(1,min(3,r[1])) if r[1] else 1; r[1]=max(0,r[1]-d); r[0]+=d; false=True
+  d=min(3,r[1])
+  if d:
+   r[1]-=d; r[0]+=d; false=True
  elif kind in ('scope','witness_bad'):
-  n=sum(r); r=[n,0,0,0]; false=tuple(r)!=vec(t); meta['outside_trust_model']=kind=='witness_bad'
+  n=sum(r); r=[n,0,0,0]
+  if tuple(r)==vec(t) and n:
+   r=[n-1,1,0,0]
+  false=tuple(r)!=vec(t); meta['outside_trust_model']=kind=='witness_bad'
  elif kind=='collusion':
-  d=max(1,min(2,sum(r[1:]) or 1)); r[0]+=d
-  for j in (1,2,3): q=min(d,r[j]); r[j]-=q; d-=q
-  false=True; meta['colluding_nf_reports']=2
+  d=min(2,sum(r[1:]))
+  if d:
+   r[0]+=d; left=d
+   for j in (1,2,3):
+    q=min(left,r[j]); r[j]-=q; left-=q
+   false=True
+  meta['colluding_nf_reports']=2
  elif kind=='replay': meta['replayed']=True
+ assert sum(r)==len(t), (kind,r,len(t))
  return tuple(r),false,meta
-
 def features(t,kind,rng):
  load={'normal':.2,'overload':.9,'mixed':.6,'inflate':.2,'hide':.2,'scope':.2,'replay':.2,'loss':.2,'epoch':.2,'collusion':.2,'witness_bad':.2}[kind]
  z=[]
