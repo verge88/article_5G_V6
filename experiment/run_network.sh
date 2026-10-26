@@ -65,7 +65,7 @@ TCPDUMP_PID=$!
 sleep 2
 
 echo "== start independent full SBI capture before 5GC =="
-sudo tcpdump -U -i any -s 0 -w "$ART/sbi.pcap" "tcp port 7777" &
+sudo dumpcap -i any -f "tcp port 7777" -w "$ART/sbi.pcapng" &
 TCPDUMP_PID=$!
 sleep 2
 
@@ -133,11 +133,11 @@ sudo kill -INT "$TCPDUMP_PID" || true
 wait "$TCPDUMP_PID" || true
 unset TCPDUMP_PID
 sync
-ls -lh "$ART/sbi.pcap"
-stat -c '%s' "$ART/sbi.pcap" > "$ART/pcap-bytes.txt"
+ls -lh "$ART/sbi.pcapng"
+stat -c '%s' "$ART/sbi.pcapng" > "$ART/pcap-bytes.txt"
 
 echo "== decode Nsmf_PDUSession CreateSMContext from PCAP =="
-python3 "$ROOT/experiment/extract_sbi.py" --pcap "$ART/sbi.pcap" --output "$ART/events.json" --client-ip "$AMF_IP"
+python3 "$ROOT/experiment/extract_sbi.py" --pcap "$ART/sbi.pcapng" --output "$ART/events.json" --client-ip "$AMF_IP"
 cat "$ART/events.json"
 python3 - "$ART/events.json" <<'PY'
 import json, re, sys
