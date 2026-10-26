@@ -64,11 +64,6 @@ sudo tcpdump -U -i any -s 0 -w "$ART/sbi.pcap" "tcp port 7777 and host ${AMF_IP}
 TCPDUMP_PID=$!
 sleep 2
 
-echo "== start independent full SBI capture before 5GC =="
-sudo dumpcap -i any -f "tcp port 7777" -w "$ART/sbi.pcapng" &
-TCPDUMP_PID=$!
-sleep 2
-
 echo "== start 5GC =="
 docker compose -f sa-deploy.yaml up -d mongo nrf scp ausf udr udm pcf bsf nssf amf smf upf webui
 
@@ -129,23 +124,15 @@ before=$(success_count)
 docker restart nr_ue >/dev/null
 wait_new_success "$before" 75
 
-sudo pkill -INT -x dumpcap 2>/dev/null || true
-for _ in $(seq 1 20); do
-  if ! kill -0 "$TCPDUMP_PID" 2>/dev/null; then break; fi
-  sleep 0.25
-done
-if kill -0 "$TCPDUMP_PID" 2>/dev/null; then
-  sudo pkill -TERM -x dumpcap 2>/dev/null || true
-  sleep 1
-fi
+sudo kill -INT "$TCPDUMP_PID" 2>/dev/null || true
 wait "$TCPDUMP_PID" 2>/dev/null || true
 unset TCPDUMP_PID
 sync
-ls -lh "$ART/sbi.pcapng"
-stat -c '%s' "$ART/sbi.pcapng" > "$ART/pcap-bytes.txt"
+ls -lh "$ART/sbi.pcap"
+stat -c '%s' "$ART/sbi.pcap" > "$ART/pcap-bytes.txt"
 
 echo "== decode Nsmf_PDUSession CreateSMContext from PCAP =="
-python3 "$ROOT/experiment/extract_sbi.py" --pcap "$ART/sbi.pcapng" --output "$ART/events.json" --client-ip "$AMF_IP"
+python3 "$ROOT/experiment/extract_sbi.py" --pcap "$ART/sbi.pcap" --output "$ART/events.json" --client-ip "$AMF_IP"
 cat "$ART/events.json"
 python3 - "$ART/events.json" <<'PY'
 import json, re, sys
