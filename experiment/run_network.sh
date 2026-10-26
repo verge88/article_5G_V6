@@ -129,8 +129,16 @@ before=$(success_count)
 docker restart nr_ue >/dev/null
 wait_new_success "$before" 75
 
-sudo kill -INT "$TCPDUMP_PID" || true
-wait "$TCPDUMP_PID" || true
+sudo pkill -INT -x dumpcap 2>/dev/null || true
+for _ in $(seq 1 20); do
+  if ! kill -0 "$TCPDUMP_PID" 2>/dev/null; then break; fi
+  sleep 0.25
+done
+if kill -0 "$TCPDUMP_PID" 2>/dev/null; then
+  sudo pkill -TERM -x dumpcap 2>/dev/null || true
+  sleep 1
+fi
+wait "$TCPDUMP_PID" 2>/dev/null || true
 unset TCPDUMP_PID
 sync
 ls -lh "$ART/sbi.pcapng"
