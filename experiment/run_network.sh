@@ -64,6 +64,11 @@ sudo tcpdump -U -i any -s 0 -w "$ART/sbi.pcap" "tcp port 7777 and host ${AMF_IP}
 TCPDUMP_PID=$!
 sleep 2
 
+echo "== start independent full SBI capture before 5GC =="
+sudo tcpdump -U -i any -s 0 -w "$ART/sbi.pcap" "tcp port 7777" &
+TCPDUMP_PID=$!
+sleep 2
+
 echo "== start 5GC =="
 docker compose -f sa-deploy.yaml up -d mongo nrf scp ausf udr udm pcf bsf nssf amf smf upf webui
 
