@@ -17,6 +17,8 @@ The workflow builds Open5GS and UERANSIM from those source tags, starts a 5G SA 
 
 GitHub-hosted CI cannot provide a physically independent trusted appliance. The experiment therefore emulates the trust split: the NF/self-report branch and the witness/verification branch are separate processes and artifacts, but they share one hosted runner. The PCAP is treated as the independent witness input for algorithm evaluation. This is suitable for reproducibility and correctness testing, not for claiming physical compromise resistance of the host.
 
+The SBI witness is captured by exactly one tcpdump process started before the 5GC so the AMF-side HTTP/2/HPACK state is present from connection establishment; competing writers to the evidence file are forbidden.
+
 Network-derived events are never silently replaced with synthetic data. If no CreateSMContext attempts can be decoded, the job fails. Controlled scenarios that Open5GS does not reliably generate on demand (overload/error/redirect transformations, bounded witness loss, coordinated false self-reports, replay, scope substitution, and witness compromise) bootstrap outcomes from the captured CreateSMContext profile and then apply explicit transformations. They are clearly labelled controlled extensions and are not presented as naturally occurring Open5GS failures.
 
 ## Comparisons implemented
